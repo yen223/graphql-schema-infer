@@ -39,6 +39,7 @@ and unify(typeA, typeB) = switch(typeA, typeB) {
     | (Impossible, _) | (_, Impossible)     => Impossible
     | (Any, NonNull(x)) | (NonNull(x), Any) => x
     | (Any, x) | (x, Any)                   => x
+    | (Array(x), Array(y))                  => Array(unify(x, y))
     | (NonNull(x), NonNull(y))              => NonNull(unify(x, y))
     | (NonNull(x), y) | (x, NonNull(y))     => unify(x, y)
     | (x, y) when x == y                    => x
@@ -80,39 +81,45 @@ let camelCase(s) = {
 
 let mapToGraphQLSchema(jst) = {
   let typeMap = ref(GraphQL.TypeMap.empty);
-  let rec makeObject(name, keyVals) = {
-      /* let name = "Object_" ++ string_of_int(idx); */
-      let objectType = GraphQL.Object({
+  let keyValMap = ref(Hashtbl.create(10));
+
+  let rec buildObject(name, keyVals) {
+    if (Hashtbl.mem(keyValMap^, keyVals)) {
+      Hashtbl.find(keyValMap^, keyVals)
+    } else {
+      let newObj = GraphQL.Object({
         name: name,
         description: None,
         fields: keyVals 
                 |> List.map(((key, value)) => GraphQL.({
                     name: camelCase(key), 
                     description: None, 
-                    output_type: aux(value, makeObject(pascalCase(key) ++ "Object")),
+                    output_type: aux(value, buildObject(pascalCase(key) ++ "Object")),
                     args: [],
                     deprecated: NotDeprecated,
                 })),
         interfaces: [],
-    });
-    typeMap := GraphQL.TypeMap.add(name, objectType, typeMap^);
-    objectType
+      });
+      Hashtbl.add(keyValMap^, keyVals, newObj);
+      typeMap := GraphQL.TypeMap.add(name, newObj, typeMap^);
+      newObj
+    }
   }
-  and aux(jst, makeObjectWithIndex) = {
+  and aux(jst, objectBuilder) = {
     switch(jst) {
-      | String => GraphQL.gqlString
-      | Float => GraphQL.gqlFloat
-      | Int => GraphQL.gqlInt
-      | Bool => GraphQL.gqlBoolean
-      | Object(keyVals) => makeObjectWithIndex(keyVals)
-      | Array(t)    => GraphQL.ListType(aux(t, makeObjectWithIndex))
-      | NonNull(t)  => GraphQL.NonNull(aux(t, makeObjectWithIndex))
-      | Any         => GraphQL.gqlString
-      | Impossible  => GraphQL.LazyType("CantUnifyTypes")
+      | String          => GraphQL.gqlString
+      | Float           => GraphQL.gqlFloat
+      | Int             => GraphQL.gqlInt
+      | Bool            => GraphQL.gqlBoolean
+      | Object(keyVals) => objectBuilder(keyVals)
+      | Array(t)        => GraphQL.ListType(aux(t, objectBuilder))
+      | NonNull(t)      => GraphQL.NonNull(aux(t, objectBuilder))
+      | Any             => GraphQL.gqlString
+      | Impossible      => GraphQL.LazyType("CantUnifyTypes")
     }
   };
   GraphQL.{
-      query: aux(jst, makeObject("QueryObject")), 
+      query: aux(jst, buildObject("QueryObject")) |> GraphQL.baseType |> t => GraphQL.NonNull(t), 
       mutation: None, 
       types: typeMap^,
   }

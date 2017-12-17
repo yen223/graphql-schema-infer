@@ -6,6 +6,7 @@ var $$Array               = require("bs-platform/lib/js/array.js");
 var Block                 = require("bs-platform/lib/js/block.js");
 var Curry                 = require("bs-platform/lib/js/curry.js");
 var $$String              = require("bs-platform/lib/js/string.js");
+var Hashtbl               = require("bs-platform/lib/js/hashtbl.js");
 var Js_dict               = require("bs-platform/lib/js/js_dict.js");
 var Js_json               = require("bs-platform/lib/js/js_json.js");
 var Caml_obj              = require("bs-platform/lib/js/caml_obj.js");
@@ -128,25 +129,53 @@ function unify(_typeA, _typeB) {
         default:
           exit$5 = 6;
       }
-    } else if (typeA.tag === 2) {
-      var x = typeA[0];
-      if (typeof typeB === "number") {
-        switch (typeB) {
-          case 4 : 
-              return x;
-          case 5 : 
-              exit$5 = 6;
-              break;
-          default:
-            exit$2 = 3;
-        }
-      } else if (typeB.tag === 2) {
-        return /* NonNull */Block.__(2, [unify(x, typeB[0])]);
-      } else {
-        exit$2 = 3;
-      }
     } else {
-      exit$5 = 6;
+      switch (typeA.tag | 0) {
+        case 1 : 
+            if (typeof typeB === "number") {
+              switch (typeB) {
+                case 4 : 
+                    exit$3 = 4;
+                    break;
+                case 5 : 
+                    exit$5 = 6;
+                    break;
+                default:
+                  exit = 1;
+              }
+            } else {
+              switch (typeB.tag | 0) {
+                case 1 : 
+                    return /* Array */Block.__(1, [unify(typeA[0], typeB[0])]);
+                case 2 : 
+                    exit$1 = 2;
+                    break;
+                default:
+                  exit = 1;
+              }
+            }
+            break;
+        case 2 : 
+            var x = typeA[0];
+            if (typeof typeB === "number") {
+              switch (typeB) {
+                case 4 : 
+                    return x;
+                case 5 : 
+                    exit$5 = 6;
+                    break;
+                default:
+                  exit$2 = 3;
+              }
+            } else if (typeB.tag === 2) {
+              return /* NonNull */Block.__(2, [unify(x, typeB[0])]);
+            } else {
+              exit$2 = 3;
+            }
+            break;
+        default:
+          exit$5 = 6;
+      }
     }
     if (exit$5 === 6) {
       if (typeof typeB === "number") {
@@ -286,29 +315,35 @@ function camelCase(s) {
 
 function mapToGraphQLSchema(jst) {
   var typeMap = [GraphQL$ReactTemplate.TypeMap[/* empty */0]];
-  var makeObject = function (name, keyVals) {
-    var objectType = /* Object */Block.__(1, [/* record */[
-          /* name */name,
-          /* description : None */0,
-          /* fields */List.map((function (param) {
-                  var key = param[0];
-                  var partial_arg = pascalCase(key) + "Object";
-                  return /* record */[
-                          /* name */camelCase(key),
-                          /* description : None */0,
-                          /* args : [] */0,
-                          /* output_type */aux(param[1], (function (param) {
-                                  return makeObject(partial_arg, param);
-                                })),
-                          /* deprecated : NotDeprecated */0
-                        ];
-                }), keyVals),
-          /* interfaces : [] */0
-        ]]);
-    typeMap[0] = Curry._3(GraphQL$ReactTemplate.TypeMap[/* add */3], name, objectType, typeMap[0]);
-    return objectType;
+  var keyValMap = [Hashtbl.create(/* None */0, 10)];
+  var buildObject = function (name, keyVals) {
+    if (Hashtbl.mem(keyValMap[0], keyVals)) {
+      return Hashtbl.find(keyValMap[0], keyVals);
+    } else {
+      var newObj = /* Object */Block.__(1, [/* record */[
+            /* name */name,
+            /* description : None */0,
+            /* fields */List.map((function (param) {
+                    var key = param[0];
+                    var partial_arg = pascalCase(key) + "Object";
+                    return /* record */[
+                            /* name */camelCase(key),
+                            /* description : None */0,
+                            /* args : [] */0,
+                            /* output_type */aux(param[1], (function (param) {
+                                    return buildObject(partial_arg, param);
+                                  })),
+                            /* deprecated : NotDeprecated */0
+                          ];
+                  }), keyVals),
+            /* interfaces : [] */0
+          ]]);
+      Hashtbl.add(keyValMap[0], keyVals, newObj);
+      typeMap[0] = Curry._3(GraphQL$ReactTemplate.TypeMap[/* add */3], name, newObj, typeMap[0]);
+      return newObj;
+    }
   };
-  var aux = function (jst, makeObjectWithIndex) {
+  var aux = function (jst, objectBuilder) {
     if (typeof jst === "number") {
       switch (jst) {
         case 1 : 
@@ -327,19 +362,19 @@ function mapToGraphQLSchema(jst) {
     } else {
       switch (jst.tag | 0) {
         case 0 : 
-            return Curry._1(makeObjectWithIndex, jst[0]);
+            return Curry._1(objectBuilder, jst[0]);
         case 1 : 
-            return /* ListType */Block.__(6, [aux(jst[0], makeObjectWithIndex)]);
+            return /* ListType */Block.__(6, [aux(jst[0], objectBuilder)]);
         case 2 : 
-            return /* NonNull */Block.__(7, [aux(jst[0], makeObjectWithIndex)]);
+            return /* NonNull */Block.__(7, [aux(jst[0], objectBuilder)]);
         
       }
     }
   };
   return /* record */[
-          /* query */aux(jst, (function (param) {
-                  return makeObject("QueryObject", param);
-                })),
+          /* query : NonNull */Block.__(7, [GraphQL$ReactTemplate.baseType(aux(jst, (function (param) {
+                          return buildObject("QueryObject", param);
+                        })))]),
           /* mutation : None */0,
           /* types */typeMap[0]
         ];
