@@ -89,7 +89,7 @@ let make = (_children) => {
         height="100%"></textarea>
     </div>
     <div style=(ReactDOMRe.Style.make(~padding="10px", ~flexBasis="100%", ()))>
-      <p>(str("GraphQL Schema:"))</p>
+      <p>(str("Inferred GraphQL Schema:"))</p>
       <textarea 
       rows=40
       style=(inputStyle) 
