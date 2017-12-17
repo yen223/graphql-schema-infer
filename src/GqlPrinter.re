@@ -25,8 +25,7 @@ let block = (header, blockLines) => {
 
 let printEnumValue = (EnumValue(name, _, _)) => name;
 
-let printDeprecated =
-  fun
+let printDeprecated = fun
   | IsDeprecated(reason) => "@deprecated(reason: \"" ++ (reason ++ "\")")
   | NotDeprecated => "";
 
@@ -85,7 +84,7 @@ and printInputValue = (inp) => {
 };
 
 let printSchema({query, types}) = {
-  let schema = block("schema", ["query: " ++ typeName(query)]);
+  let schema = block("schema", ["query: " ++ typeLabel(query)]);
   let body = TypeMap.bindings(types)
   |> List.map(snd)
   |> List.map(printType)

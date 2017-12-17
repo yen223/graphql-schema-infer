@@ -67,19 +67,12 @@ type schema = {
   types: type_map
 };
 
-let rec typeName =
-  fun
-  | Scalar({name, _})
-  | Object({name, _})
-  | Interface({name, _})
-  | Union({name, _})
-  | Enum({name, _})
-  | InputObject({name, _})
-  | LazyType(name) => name
-  | ListType(typ)
-  | NonNull(typ) => typeName(typ);
+let rec baseType(typ) = switch(typ) {
+  | ListType(t) | NonNull(t) => baseType(t)
+  | _ => typ
+};
 
-let rec typeLabel = fun
+let rec typeName(typ) = switch(typ) {
   | Scalar({name, _})
   | Object({name, _})
   | Interface({name, _})
@@ -87,6 +80,18 @@ let rec typeLabel = fun
   | Enum({name, _})
   | InputObject({name, _})
   | LazyType(name) => name
-  | ListType(typ) => "[" ++ typeLabel(typ) ++ "]"
-  | NonNull(typ) => typeLabel(typ) ++ "!"
-;
+  | ListType(t)
+  | NonNull(t) => typeName(t)
+};
+
+let rec typeLabel(typ) = switch(typ) {
+  | Scalar({name, _})
+  | Object({name, _})
+  | Interface({name, _})
+  | Union({name, _})
+  | Enum({name, _})
+  | InputObject({name, _})
+  | LazyType(name) => name
+  | ListType(t) => "[" ++ typeLabel(t) ++ "]"
+  | NonNull(t) => typeLabel(t) ++ "!"
+};

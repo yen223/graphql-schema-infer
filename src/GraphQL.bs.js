@@ -7,32 +7,46 @@ var $$String = require("bs-platform/lib/js/string.js");
 
 var TypeMap = $$Map.Make([$$String.compare]);
 
-function typeName(_param) {
+function baseType(_typ) {
   while(true) {
-    var param = _param;
-    switch (param.tag | 0) {
+    var typ = _typ;
+    switch (typ.tag | 0) {
       case 6 : 
       case 7 : 
-          _param = param[0];
+          _typ = typ[0];
           continue ;
-          case 8 : 
-          return param[0];
-      default:
-        return param[0][/* name */0];
+          default:
+        return typ;
     }
   };
 }
 
-function typeLabel(param) {
-  switch (param.tag | 0) {
+function typeName(_typ) {
+  while(true) {
+    var typ = _typ;
+    switch (typ.tag | 0) {
+      case 6 : 
+      case 7 : 
+          _typ = typ[0];
+          continue ;
+          case 8 : 
+          return typ[0];
+      default:
+        return typ[0][/* name */0];
+    }
+  };
+}
+
+function typeLabel(typ) {
+  switch (typ.tag | 0) {
     case 6 : 
-        return "[" + (typeLabel(param[0]) + "]");
+        return "[" + (typeLabel(typ[0]) + "]");
     case 7 : 
-        return typeLabel(param[0]) + "!";
+        return typeLabel(typ[0]) + "!";
     case 8 : 
-        return param[0];
+        return typ[0];
     default:
-      return param[0][/* name */0];
+      return typ[0][/* name */0];
   }
 }
 
@@ -61,6 +75,7 @@ exports.gqlInt     = gqlInt;
 exports.gqlFloat   = gqlFloat;
 exports.gqlBoolean = gqlBoolean;
 exports.TypeMap    = TypeMap;
+exports.baseType   = baseType;
 exports.typeName   = typeName;
 exports.typeLabel  = typeLabel;
 /* TypeMap Not a pure module */

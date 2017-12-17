@@ -7,7 +7,7 @@ var React                    = require("react");
 var Js_json                  = require("bs-platform/lib/js/js_json.js");
 var Js_boolean               = require("bs-platform/lib/js/js_boolean.js");
 var ReasonReact              = require("reason-react/src/ReasonReact.js");
-var Json$ReactTemplate       = require("./Json.bs.js");
+var JsonType$ReactTemplate   = require("./JsonType.bs.js");
 var GqlPrinter$ReactTemplate = require("./GqlPrinter.bs.js");
 
 var component = ReasonReact.reducerComponent("Page");
@@ -23,12 +23,13 @@ function valueFromEvent(evt) {
 var inputStyle = {
   border: "1px solid #d4d7d9",
   color: "#424548",
+  display: "flex",
   fontSize: "15px",
-  height: "500px",
+  height: "100%",
   lineHeight: "1",
-  padding: "0 12px",
+  padding: "12px 12px",
   width: "100%",
-  borderRadius: "4px",
+  borderRadius: "2px",
   boxSizing: "border-box",
   resize: "none",
   transition: "border-color 0.15s ease"
@@ -36,14 +37,14 @@ var inputStyle = {
 
 function jsonToGql(json) {
   try {
-    return GqlPrinter$ReactTemplate.printSchema(Json$ReactTemplate.mapToGraphQLSchema(Json$ReactTemplate.deriveType(Js_json.classify(JSON.parse(json)))));
+    return GqlPrinter$ReactTemplate.printSchema(JsonType$ReactTemplate.mapToGraphQLSchema(JsonType$ReactTemplate.deriveType(Js_json.classify(JSON.parse(json)))));
   }
   catch (exn){
     return "";
   }
 }
 
-var initialJson = "\n  {\n    \"hero\": {\n      \"name\": \"R2-D2\",\n      \"friends\": [\n        {\n          \"name\": \"Luke Skywalker\"\n        },\n        {\n          \"name\": \"Han Solo\"\n        },\n        {\n          \"name\": \"Leia Organa\"\n        }\n      ]\n    }\n  }\n";
+var initialJson = "{\n  \"hero\": {\n    \"name\": \"R2-D2\",\n    \"friends\": [\n      {\n        \"name\": \"Luke Skywalker\"\n      },\n      {\n        \"name\": \"Han Solo\"\n      },\n      {\n        \"name\": \"Leia Organa\"\n      }\n    ]\n  }\n}\n";
 
 function make() {
   var newrecord = component.slice();
@@ -51,26 +52,36 @@ function make() {
       var match = param[/* state */2];
       return React.createElement("div", {
                   style: {
-                    margin: "0 auto",
-                    maxWidth: "500px"
+                    display: "flex",
+                    margin: "10px auto"
                   }
-                }, React.createElement("p", undefined, "JSON:"), React.createElement("textarea", {
-                      style: inputStyle,
-                      height: "100%",
-                      rows: 40,
-                      value: match[/* json */0],
-                      width: "100%",
-                      onChange: Curry._1(param[/* reduce */1], (function (_evt) {
-                              return /* UpdateGql */[_evt.target.value];
-                            }))
-                    }), React.createElement("p", undefined, "Gql Output:"), React.createElement("textarea", {
-                      style: inputStyle,
-                      height: "100%",
-                      readOnly: Js_boolean.to_js_boolean(/* true */1),
-                      rows: 40,
-                      value: match[/* gql */1],
-                      width: "100%"
-                    }));
+                }, React.createElement("div", {
+                      style: {
+                        padding: "10px",
+                        flexBasis: "100%"
+                      }
+                    }, React.createElement("p", undefined, "JSON:"), React.createElement("textarea", {
+                          style: inputStyle,
+                          height: "100%",
+                          rows: 40,
+                          value: match[/* json */0],
+                          width: "100%",
+                          onChange: Curry._1(param[/* reduce */1], (function (_evt) {
+                                  return /* UpdateGql */[_evt.target.value];
+                                }))
+                        })), React.createElement("div", {
+                      style: {
+                        padding: "10px",
+                        flexBasis: "100%"
+                      }
+                    }, React.createElement("p", undefined, "GraphQL Schema:"), React.createElement("textarea", {
+                          style: inputStyle,
+                          height: "100%",
+                          readOnly: Js_boolean.to_js_boolean(/* true */1),
+                          rows: 40,
+                          value: match[/* gql */1],
+                          width: "100%"
+                        })));
     });
   newrecord[/* initialState */10] = (function () {
       return /* record */[

@@ -149,7 +149,7 @@ function printInputValue(inp) {
 
 function printSchema(param) {
   var schema = block("schema", /* :: */[
-        "query: " + GraphQL$ReactTemplate.typeName(param[/* query */0]),
+        "query: " + GraphQL$ReactTemplate.typeLabel(param[/* query */0]),
         /* [] */0
       ]);
   var body = joinWith("\n\n", List.filter((function (x) {
