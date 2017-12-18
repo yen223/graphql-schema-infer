@@ -47,7 +47,7 @@ let rec printType = fun
       block(header, blockLines)
     }
   | Union({name, possibleTypes}) =>
-    "union " ++ (name ++ (" = " ++ (possibleTypes |> map(printType) |> joinWith(" | "))))
+    "union " ++ name ++ " = " ++ (possibleTypes |> map(typeName) |> joinWith(" | "))
   | Enum({name, enumValues}) => {
       let header = "enum " ++ name;
       block(header, List.map(printEnumValue, enumValues))
