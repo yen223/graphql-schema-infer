@@ -13,4 +13,13 @@ let isOk(r) = switch(r){
   | Err(_) => false
 }
 ;
+let isErr(r) = !isOk(r);
 let unwrap(Ok(r)) = r;
+
+let mapOrFirstError(fn, results) = {
+  if (List.for_all(isOk, results)) {
+    results |> List.map(unwrap) |> fn
+  } else {
+    List.find(isErr, results)
+  }
+}

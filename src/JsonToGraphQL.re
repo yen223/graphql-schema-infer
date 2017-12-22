@@ -181,48 +181,42 @@ let mapToGraphQLSchema(jst) = {
       Result.Ok(Hashtbl.find(keyValMap^, keyVals))
     } else {
       let fieldNames = keyVals |> map(fst);
-      let fieldResultTypes = keyVals 
-                             |> map(((key, value)) => aux(value, pascalCase(key)));
-      if (List.for_all(Result.isOk, fieldResultTypes)) {
-        let obj = fieldResultTypes 
-                  |> map(Result.unwrap)
-                  |> map2(mkField, fieldNames)
-                  |> (fields => GraphQL.Object({
-                      name: getName(name ++ "Object"),
-                      description: None,
-                      fields,
-                      interfaces: [],
-                    }));
+      keyVals 
+      |> map(((key, value)) => aux(value, pascalCase(key)))
+      |> Result.mapOrFirstError((fieldTypes) => {
+        let obj = fieldTypes
+        |> map2(mkField, fieldNames)
+        |> (fields => GraphQL.Object({
+            name: getName(name ++ "Object"),
+            description: None,
+            fields,
+            interfaces: [],
+        }));
         Hashtbl.add(keyValMap^, keyVals, obj);
         typeMap := GraphQL.TypeMap.add(name, obj, typeMap^);
         Result.ok(obj)
-      } else {
-        fieldResultTypes 
-        |> List.find(n => !Result.isOk(n))
-      }
+      })
     }
   }
   and buildPossibleTypes(name, types) = {
-    let gqlTypes = types |> map((x) => aux(x, name)); 
-    if (List.for_all(Result.isOk, gqlTypes)) {
-      let types = gqlTypes |> map(Result.unwrap) |> uniqueBy(GraphQL.typeName);
-      switch (types) {
+    types 
+    |> map((x) => aux(x, name))
+    |> Result.mapOrFirstError(types => {
+      switch (types |> uniqueBy(GraphQL.typeName)) {
         | [] => aux(Any, name)
         | [t] => Result.Ok(t)
-        | [t, ...ts] => {
+        | ts => {
             let name = getName(name ++ "Union");
             let unionType = GraphQL.Union({
               name,
               description: None,
-              possibleTypes: types,
+              possibleTypes: ts,
             });
           typeMap := GraphQL.TypeMap.add(name, unionType, typeMap^);
           Result.Ok(unionType)
         }
       }
-    } else {
-      List.find(n => !Result.isOk(n), gqlTypes)
-    }
+    })
   }
   and aux(jst, name) = {
     switch(jst) {
