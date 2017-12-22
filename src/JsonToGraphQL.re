@@ -45,7 +45,9 @@ let rec deriveType(json) = switch json {
            |> (x) => NonNull(Object(x))
   } 
 };
+
 let map = List.map;
+let map2 = List.map2;
 let fold = List.fold_left;
 let concat = List.concat;
   
@@ -149,6 +151,14 @@ let camelCase(s) = {
   |> joinWith("")
 };
 
+let mkField(name, outputType) = GraphQL.({
+  name, 
+  description: None, 
+  output_type: outputType,
+  args: [],
+  deprecated: NotDeprecated,
+});
+
 let mapToGraphQLSchema(jst) = {
   let typeMap = ref(GraphQL.TypeMap.empty);
   let keyValMap = ref(Hashtbl.create(10));
@@ -168,64 +178,70 @@ let mapToGraphQLSchema(jst) = {
 
   let rec buildObject(name, keyVals) = {
     if (Hashtbl.mem(keyValMap^, keyVals)) {
-      Hashtbl.find(keyValMap^, keyVals)
+      Result.Ok(Hashtbl.find(keyValMap^, keyVals))
     } else {
-      let fields = keyVals 
-      |> map(((key, value)) => GraphQL.({
-        name: camelCase(key), 
-        description: None, 
-        output_type: aux(value, pascalCase(key)),
-        args: [],
-        deprecated: NotDeprecated,
-      }));
-      let name = getName(name ++ "Object");
-      let newObj = GraphQL.Object({
-        name,
-        description: None,
-        fields,
-        interfaces: [],
-      });
-      Hashtbl.add(keyValMap^, keyVals, newObj);
-      typeMap := GraphQL.TypeMap.add(name, newObj, typeMap^);
-      newObj
+      let fieldNames = keyVals |> map(fst);
+      let fieldResultTypes = keyVals 
+                             |> map(((key, value)) => aux(value, pascalCase(key)));
+      if (List.for_all(Result.isOk, fieldResultTypes)) {
+        let obj = fieldResultTypes 
+                  |> map(Result.unwrap)
+                  |> map2(mkField, fieldNames)
+                  |> (fields => GraphQL.Object({
+                      name: getName(name ++ "Object"),
+                      description: None,
+                      fields,
+                      interfaces: [],
+                    }));
+        Hashtbl.add(keyValMap^, keyVals, obj);
+        typeMap := GraphQL.TypeMap.add(name, obj, typeMap^);
+        Result.ok(obj)
+      } else {
+        fieldResultTypes 
+        |> List.find(n => !Result.isOk(n))
+      }
     }
   }
   and buildPossibleTypes(name, types) = {
-    let types = types |> map((x) => aux(x, name)) |> uniqueBy(GraphQL.typeName);
-    switch (types) {
-      | [] => aux(Any, name)
-      | [t] => t
-      | [t, ...ts] => {
-          let name = getName(name ++ "Union");
-          Js.log(name);
-          types |> map(t => Js.log(GraphQL.typeName(t)));
-          let unionType = GraphQL.Union({
-            name,
-            description: None,
-            possibleTypes: types,
-          });
-        typeMap := GraphQL.TypeMap.add(name, unionType, typeMap^);
-        unionType    
+    let gqlTypes = types |> map((x) => aux(x, name)); 
+    if (List.for_all(Result.isOk, gqlTypes)) {
+      let types = gqlTypes |> map(Result.unwrap) |> uniqueBy(GraphQL.typeName);
+      switch (types) {
+        | [] => aux(Any, name)
+        | [t] => Result.Ok(t)
+        | [t, ...ts] => {
+            let name = getName(name ++ "Union");
+            let unionType = GraphQL.Union({
+              name,
+              description: None,
+              possibleTypes: types,
+            });
+          typeMap := GraphQL.TypeMap.add(name, unionType, typeMap^);
+          Result.Ok(unionType)
+        }
       }
+    } else {
+      List.find(n => !Result.isOk(n), gqlTypes)
     }
   }
   and aux(jst, name) = {
     switch(jst) {
-      | String          => GraphQL.gqlString
-      | Float           => GraphQL.gqlFloat
-      | Int             => GraphQL.gqlInt
-      | Bool            => GraphQL.gqlBoolean
-      | Object(keyVals) => buildObject(name, keyVals)
+      | String                  => GraphQL.gqlString |> Result.ok
+      | Float                   => GraphQL.gqlFloat |> Result.ok
+      | Int                     => GraphQL.gqlInt |> Result.ok
+      | Bool                    => GraphQL.gqlBoolean |> Result.ok
+      | Object(keyVals)         => buildObject(name, keyVals)
       | PossibleTypes(types)    => buildPossibleTypes(name, types)
-      | Array(t)        => GraphQL.ListType(aux(t, name))
-      | NonNull(t)      => GraphQL.NonNull(aux(t, name))
-      | Any             => GraphQL.LazyType("Any")
-      | Impossible      => GraphQL.LazyType("CantUnifyTypes")
+      | Array(t)                => aux(t, name) |> Result.map(n => GraphQL.ListType(n))
+      | NonNull(t)              => aux(t, name) |> Result.map(n => GraphQL.NonNull(n))
+      | Any                     => GraphQL.LazyType("Any") |> Result.ok
+      | Impossible              => Result.Err("Could not resolve type")
     }
   };
-  GraphQL.{
-      query: aux(jst, "Query") |> GraphQL.baseType |> t => GraphQL.NonNull(t), 
-      mutation: None, 
+  aux(jst, "Query") 
+  |> Result.map(t => GraphQL.{
+      query: t |> GraphQL.baseType |> t => GraphQL.NonNull(t), 
+      mutation: None,
       types: typeMap^,
-  }
+    })
 };

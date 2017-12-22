@@ -1,51 +1,4 @@
 /* This is the basic component. */
-
-type state = {
-  json: string,
-  gql: string
-};
-type action = 
-  | UpdateGql(string)
-;
-
-let component = ReasonReact.reducerComponent("Page");
-
-let str = ReasonReact.stringToElement;
-let valueFromEvent = (evt):string => (
-  evt |> ReactEventRe.Form.target |> ReactDOMRe.domElementToObj
-)##value
-;
-
-let inputStyle = ReactDOMRe.Style.make(
-  ~display="flex",
-  ~fontSize="15px",
-  ~height="100%",
-  ~lineHeight="1",
-  ~borderRadius="2px",
-  ~color="#424548",
-  ~padding="12px 12px",
-  ~width="100%",
-  ~transition="border-color 0.15s ease",
-  ~resize="none",
-  ~boxSizing="border-box",
-  ~border="1px solid #d4d7d9",
-  ()
-);
-
-let jsonToGql(json) = {
-  try ( 
-    json 
-    |> Js.Json.parseExn 
-    |> Js.Json.classify
-    |> JsonToGraphQL.deriveType
-    |> JsonToGraphQL.simplify
-    |> JsonToGraphQL.mapToGraphQLSchema
-    |> GqlPrinter.printSchema
-  ){
-    | _ => ""
-  }
-};
-
 let initialJson = {|[
   {
      "eye_candy":{
@@ -1003,6 +956,54 @@ let initialJson = {|[
   }
 ]
 |};
+type state = {
+  json: string,
+  gql: Result.t(string)
+};
+type action = 
+  | UpdateGql(string)
+;
+
+let component = ReasonReact.reducerComponent("Page");
+
+let str = ReasonReact.stringToElement;
+let valueFromEvent = (evt):string => (
+  evt |> ReactEventRe.Form.target |> ReactDOMRe.domElementToObj
+)##value
+;
+
+let codeStyle = ReactDOMRe.Style.make(
+  ~display="flex",
+  ~fontSize="15px",
+  ~height="100%",
+  ~lineHeight="1",
+  ~borderRadius="2px",
+  ~padding="12px 12px",
+  ~width="100%",
+  ~transition="border-color 0.15s ease",
+  ~resize="none",
+  ~boxSizing="border-box",
+  ~border="1px solid #d4d7d9",
+  ()
+);
+
+let okStyle = ReactDOMRe.Style.make(~color="#424548", ());
+let errStyle = ReactDOMRe.Style.make(~color="#ff0000", ());
+let jsonToGql(json) = {
+  try ( 
+    json 
+    |> Js.Json.parseExn 
+    |> Js.Json.classify
+    |> JsonToGraphQL.deriveType
+    |> JsonToGraphQL.simplify
+    |> JsonToGraphQL.mapToGraphQLSchema
+    |> Result.map(GqlPrinter.printSchema)
+  ){
+    | _ => Result.Err("Invalid JSON!")
+  }
+};
+
+
 let make = (_children) => {
   ...component,
   initialState: () => {
@@ -1015,29 +1016,37 @@ let make = (_children) => {
         gql: jsonToGql(json)
       })
   },
-  render: ({state: {json, gql}, reduce}) =>
-  <div style=(
-    ReactDOMRe.Style.make(~margin="10px auto", ~display="flex", ())
-  )>
-    <div style=(ReactDOMRe.Style.make(~padding="10px", ~flexBasis="100%", ())) >
-      <p>(str("JSON:"))</p>
-      <textarea 
+  render: ({state: {json, gql}, reduce}) => {
+    let style = switch(gql) {
+      | Result.Ok(_)  => codeStyle |> ReactDOMRe.Style.combine(okStyle)
+      | Result.Err(_) => codeStyle |> ReactDOMRe.Style.combine(errStyle)
+    };
+    let text = switch(gql) {
+      | Result.Ok(s) | Result.Err(s) => s
+    };
+    <div style=(
+      ReactDOMRe.Style.make(~margin="10px auto", ~display="flex", ())
+    )>
+      <div style=(ReactDOMRe.Style.make(~padding="10px", ~flexBasis="100%", ())) >
+        <p>(str("JSON:"))</p>
+        <textarea 
+          rows=40
+          style=(codeStyle)
+          value=(json)
+          onChange=(reduce((_evt) => UpdateGql(valueFromEvent(_evt)))) 
+          width="100%"
+          height="100%"></textarea>
+      </div>
+      <div style=(ReactDOMRe.Style.make(~padding="10px", ~flexBasis="100%", ()))>
+        <p>(str("Inferred GraphQL Schema:"))</p>
+        <textarea 
         rows=40
-        style=(inputStyle)
-        value=(json)
-        onChange=(reduce((_evt) => UpdateGql(valueFromEvent(_evt)))) 
+        style=(style) 
+        readOnly=(Js.Boolean.to_js_boolean(true))
+        value=(text)
         width="100%"
         height="100%"></textarea>
+      </div>
     </div>
-    <div style=(ReactDOMRe.Style.make(~padding="10px", ~flexBasis="100%", ()))>
-      <p>(str("Inferred GraphQL Schema:"))</p>
-      <textarea 
-      rows=40
-      style=(inputStyle) 
-      readOnly=(Js.Boolean.to_js_boolean(true))
-      value=(gql)
-      width="100%"
-      height="100%"></textarea>
-    </div>
-  </div>
+  }
 };
